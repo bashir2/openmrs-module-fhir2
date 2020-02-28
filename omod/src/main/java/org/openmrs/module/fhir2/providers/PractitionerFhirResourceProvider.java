@@ -25,7 +25,7 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Practitioner;
 import org.openmrs.module.fhir2.api.FhirPractitionerService;
-import org.openmrs.module.fhir2.util.FhirUtils;
+import org.openmrs.module.fhir2.util.FhirServerUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -55,13 +55,13 @@ public class PractitionerFhirResourceProvider implements IResourceProvider {
 	@Search
 	@SuppressWarnings("unused")
 	public Bundle findPractitionersByName(@RequiredParam(name = Practitioner.SP_NAME) @NotNull String name) {
-		return FhirUtils.convertSearchResultsToBundle(practitionerService.findPractitionerByName(name));
+		return FhirServerUtils.convertSearchResultsToBundle(practitionerService.findPractitionerByName(name));
 	}
 	
 	@Search
 	@SuppressWarnings("unused")
 	public Bundle findPractitionersByIdentifier(
 	        @RequiredParam(name = Practitioner.SP_IDENTIFIER) @NotNull String identifier) {
-		return FhirUtils.convertSearchResultsToBundle(practitionerService.findPractitionerByIdentifier(identifier));
+		return FhirServerUtils.convertSearchResultsToBundle(practitionerService.findPractitionerByIdentifier(identifier));
 	}
 }
