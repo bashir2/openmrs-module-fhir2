@@ -14,8 +14,13 @@ import static org.hibernate.criterion.Restrictions.eq;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import java.util.Collection;
+
+import ca.uhn.fhir.rest.api.SortSpec;
+import ca.uhn.fhir.rest.param.StringOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
+import org.hibernate.Criteria;
 import org.hibernate.SessionFactory;
 import org.openmrs.Condition;
 import org.openmrs.annotation.OpenmrsProfile;
@@ -27,7 +32,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Setter(AccessLevel.PACKAGE)
 @OpenmrsProfile(openmrsPlatformVersion = "2.2.* - 2.*")
-public class FhirConditionDaoImpl_2_2 implements FhirConditionDao<Condition> {
+public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditionDao<Condition> {
 	
 	@Inject
 	@Named("sessionFactory")
@@ -37,5 +42,30 @@ public class FhirConditionDaoImpl_2_2 implements FhirConditionDao<Condition> {
 	public Condition getConditionByUuid(String uuid) {
 		return (Condition) sessionFactory.getCurrentSession().createCriteria(Condition.class).add(eq("uuid", uuid))
 		        .uniqueResult();
+	}
+	
+	@Override
+	public Collection<Condition> searchForConditions(StringOrListParam name, StringOrListParam given,
+	        StringOrListParam family, SortSpec sort) {
+		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Condition.class);
+		
+		/*criteria.createAlias("patient", "pn");
+			criteria.createAlias("patient.names", "nm");*/
+		Criteria patientCriteria = criteria.createCriteria("patient");
+		handleNames(patientCriteria, /*"pn.nm",*/ name, given, family);
+		/*
+		handleIdentifier(criteria, identifier);
+		handleGender("gender", gender).ifPresent(criteria::add);
+		handleDateRange("birthdate", birthDate).ifPresent(criteria::add);
+		handleDateRange("deathdate", deathDate).ifPresent(criteria::add);
+		handleBoolean("dead", deceased).ifPresent(criteria::add);
+		handlePersonAddress("pad", city, state, postalCode, null).ifPresent(c -> {
+			criteria.createAlias("addresses", "pad");
+			criteria.add(c);
+		});
+		 */
+		handleSort(criteria, sort);
+		
+		return criteria.list();
 	}
 }

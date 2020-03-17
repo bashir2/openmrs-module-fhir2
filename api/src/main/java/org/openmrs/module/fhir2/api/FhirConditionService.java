@@ -11,9 +11,17 @@ package org.openmrs.module.fhir2.api;
 
 import javax.validation.constraints.NotNull;
 
+import java.util.Collection;
+
+import ca.uhn.fhir.rest.annotation.Sort;
+import ca.uhn.fhir.rest.api.SortSpec;
+import ca.uhn.fhir.rest.param.StringOrListParam;
 import org.hl7.fhir.r4.model.Condition;
 
 public interface FhirConditionService {
 	
 	Condition getConditionByUuid(@NotNull String uuid);
+	
+	Collection<Condition> searchConditions(StringOrListParam name, StringOrListParam given, StringOrListParam family,
+	        @Sort SortSpec sort);
 }

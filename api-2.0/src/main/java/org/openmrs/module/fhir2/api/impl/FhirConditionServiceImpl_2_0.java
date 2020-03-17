@@ -11,6 +11,12 @@ package org.openmrs.module.fhir2.api.impl;
 
 import javax.inject.Inject;
 
+import java.util.Collection;
+import java.util.stream.Collectors;
+
+import ca.uhn.fhir.rest.annotation.Sort;
+import ca.uhn.fhir.rest.api.SortSpec;
+import ca.uhn.fhir.rest.param.StringOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hl7.fhir.r4.model.Condition;
@@ -39,5 +45,12 @@ public class FhirConditionServiceImpl_2_0 implements FhirConditionService {
 	@Transactional(readOnly = true)
 	public Condition getConditionByUuid(String uuid) {
 		return conditionTranslator.toFhirResource(dao.getConditionByUuid(uuid));
+	}
+	
+	@Override
+	public Collection<Condition> searchConditions(StringOrListParam name, StringOrListParam given, StringOrListParam family,
+	        @Sort SortSpec sort) {
+		return dao.searchForConditions(name, given, family, sort).stream().map(conditionTranslator::toFhirResource)
+		        .collect(Collectors.toList());
 	}
 }

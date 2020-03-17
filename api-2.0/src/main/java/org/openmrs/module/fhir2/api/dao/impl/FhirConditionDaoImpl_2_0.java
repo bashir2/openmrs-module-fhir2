@@ -14,6 +14,10 @@ import static org.hibernate.criterion.Restrictions.eq;
 import javax.inject.Inject;
 import javax.inject.Named;
 
+import java.util.Collection;
+
+import ca.uhn.fhir.rest.api.SortSpec;
+import ca.uhn.fhir.rest.param.StringOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.SessionFactory;
@@ -38,5 +42,11 @@ public class FhirConditionDaoImpl_2_0 implements FhirConditionDao<Condition> {
 		return (Condition) sessionFactory.getCurrentSession()
 		        .createCriteria(org.openmrs.module.emrapi.conditionslist.Condition.class).add(eq("uuid", uuid))
 		        .uniqueResult();
+	}
+	
+	@Override
+	public Collection<Condition> searchForConditions(StringOrListParam name, StringOrListParam given,
+	        StringOrListParam family, SortSpec sort) {
+		return null; // TODO!
 	}
 }

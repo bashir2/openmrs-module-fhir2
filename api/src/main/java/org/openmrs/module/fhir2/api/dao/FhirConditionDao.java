@@ -11,7 +11,15 @@ package org.openmrs.module.fhir2.api.dao;
 
 import javax.validation.constraints.NotNull;
 
+import java.util.Collection;
+
+import ca.uhn.fhir.rest.api.SortSpec;
+import ca.uhn.fhir.rest.param.StringOrListParam;
+
 public interface FhirConditionDao<T> {
 	
 	T getConditionByUuid(@NotNull String uuid);
+	
+	Collection<T> searchForConditions(StringOrListParam name, StringOrListParam given, StringOrListParam family,
+	        SortSpec sort);
 }
