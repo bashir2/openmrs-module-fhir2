@@ -18,7 +18,10 @@ import ca.uhn.fhir.rest.annotation.Read;
 import ca.uhn.fhir.rest.annotation.Search;
 import ca.uhn.fhir.rest.annotation.Sort;
 import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.StringOrListParam;
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.QuantityParam;
+import ca.uhn.fhir.rest.param.ReferenceParam;
+import ca.uhn.fhir.rest.param.TokenOrListParam;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import lombok.AccessLevel;
@@ -30,8 +33,6 @@ import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Patient;
 import org.openmrs.module.fhir2.api.FhirConditionService;
 import org.openmrs.module.fhir2.util.FhirUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -39,8 +40,6 @@ import org.springframework.stereotype.Component;
 @Qualifier("fhirResources")
 @Setter(AccessLevel.PACKAGE)
 public class ConditionFhirResourceProvider implements IResourceProvider {
-	
-	private static final Logger log = LoggerFactory.getLogger(ConditionFhirResourceProvider.class);
 	
 	@Inject
 	private FhirConditionService conditionService;
@@ -61,13 +60,18 @@ public class ConditionFhirResourceProvider implements IResourceProvider {
 	
 	@Search
 	//@SuppressWarnings("unused")
-	// TODO the name is obviously incorrect!
-	public Bundle searchPatients(@OptionalParam(name = "random_name"/*Patient.SP_NAME*/) StringOrListParam name,
-	        @OptionalParam(name = Patient.SP_GIVEN) StringOrListParam given,
-	        @OptionalParam(name = Patient.SP_FAMILY) StringOrListParam family, @Sort SortSpec sort) {
-		log.info("HERE DEBUG name: " + name);
-		//return new Bundle();
-		return FhirUtils.convertSearchResultsToBundle(conditionService.searchConditions(name, given, family, sort));
-		//				identifier,	gender, birthDate, deathDate, deceased, city, state, postalCode, sort));
+	public Bundle searchConditions(
+	        @OptionalParam(name = Condition.SP_PATIENT, chainWhitelist = { "", Patient.SP_IDENTIFIER, Patient.SP_NAME,
+	                Patient.SP_GIVEN, Patient.SP_FAMILY }) ReferenceParam patientParam,
+	        @OptionalParam(name = Condition.SP_SUBJECT, chainWhitelist = { "", Patient.SP_IDENTIFIER, Patient.SP_NAME,
+	                Patient.SP_GIVEN, Patient.SP_FAMILY }) ReferenceParam subjectParam,
+	        @OptionalParam(name = Condition.SP_CODE) TokenOrListParam code,
+	        @OptionalParam(name = Condition.SP_CLINICAL_STATUS) TokenOrListParam clinicalStatus,
+	        @OptionalParam(name = Condition.SP_ONSET_DATE) DateParam onsetDate,
+	        @OptionalParam(name = Condition.SP_ONSET_AGE) QuantityParam onsetAge,
+	        @OptionalParam(name = Condition.SP_RECORDED_DATE) DateParam recordedDate, @Sort SortSpec sort) {
+		return FhirUtils.convertSearchResultsToBundle(conditionService.searchConditions(patientParam, subjectParam, code,
+		    clinicalStatus, onsetDate, onsetAge, recordedDate, sort));
 	}
+	
 }

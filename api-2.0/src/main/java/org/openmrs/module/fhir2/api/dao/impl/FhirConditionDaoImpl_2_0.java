@@ -17,7 +17,10 @@ import javax.inject.Named;
 import java.util.Collection;
 
 import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.StringOrListParam;
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.QuantityParam;
+import ca.uhn.fhir.rest.param.ReferenceParam;
+import ca.uhn.fhir.rest.param.TokenOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.SessionFactory;
@@ -45,8 +48,9 @@ public class FhirConditionDaoImpl_2_0 implements FhirConditionDao<Condition> {
 	}
 	
 	@Override
-	public Collection<Condition> searchForConditions(StringOrListParam name, StringOrListParam given,
-	        StringOrListParam family, SortSpec sort) {
-		return null; // TODO!
+	public Collection<Condition> searchForConditions(ReferenceParam patientParam, ReferenceParam subjectParam,
+	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
+	        DateParam recordedDate, SortSpec sort) {
+		return null; // TODO
 	}
 }

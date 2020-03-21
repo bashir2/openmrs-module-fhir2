@@ -15,13 +15,17 @@ import java.util.Collection;
 
 import ca.uhn.fhir.rest.annotation.Sort;
 import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.StringOrListParam;
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.QuantityParam;
+import ca.uhn.fhir.rest.param.ReferenceParam;
+import ca.uhn.fhir.rest.param.TokenOrListParam;
 import org.hl7.fhir.r4.model.Condition;
 
 public interface FhirConditionService {
 	
 	Condition getConditionByUuid(@NotNull String uuid);
 	
-	Collection<Condition> searchConditions(StringOrListParam name, StringOrListParam given, StringOrListParam family,
+	Collection<Condition> searchConditions(ReferenceParam patientParam, ReferenceParam subjectParam, TokenOrListParam code,
+	        TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge, DateParam recordedDate,
 	        @Sort SortSpec sort);
 }

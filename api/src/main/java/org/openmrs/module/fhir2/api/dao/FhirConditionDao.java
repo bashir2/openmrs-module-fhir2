@@ -14,12 +14,16 @@ import javax.validation.constraints.NotNull;
 import java.util.Collection;
 
 import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.StringOrListParam;
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.QuantityParam;
+import ca.uhn.fhir.rest.param.ReferenceParam;
+import ca.uhn.fhir.rest.param.TokenOrListParam;
 
 public interface FhirConditionDao<T> {
 	
 	T getConditionByUuid(@NotNull String uuid);
 	
-	Collection<T> searchForConditions(StringOrListParam name, StringOrListParam given, StringOrListParam family,
+	Collection<T> searchForConditions(ReferenceParam patientParam, ReferenceParam subjectParam, TokenOrListParam code,
+	        TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge, DateParam recordedDate,
 	        SortSpec sort);
 }

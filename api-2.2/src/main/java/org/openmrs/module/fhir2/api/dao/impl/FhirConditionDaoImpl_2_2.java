@@ -15,14 +15,20 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.util.Collection;
+import java.util.Optional;
 
 import ca.uhn.fhir.rest.api.SortSpec;
-import ca.uhn.fhir.rest.param.StringOrListParam;
+import ca.uhn.fhir.rest.param.DateParam;
+import ca.uhn.fhir.rest.param.QuantityParam;
+import ca.uhn.fhir.rest.param.ReferenceParam;
+import ca.uhn.fhir.rest.param.TokenOrListParam;
+import ca.uhn.fhir.rest.param.TokenParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.Criteria;
 import org.hibernate.SessionFactory;
 import org.openmrs.Condition;
+import org.openmrs.ConditionClinicalStatus;
 import org.openmrs.annotation.OpenmrsProfile;
 import org.openmrs.module.fhir2.api.dao.FhirConditionDao;
 import org.springframework.context.annotation.Primary;
@@ -44,26 +50,41 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 		        .uniqueResult();
 	}
 	
+	private ConditionClinicalStatus convertStatus(String status) {
+		if ("active".equalsIgnoreCase(status)) {
+			return ConditionClinicalStatus.ACTIVE;
+		}
+		if ("inactive".equalsIgnoreCase(status)) {
+			return ConditionClinicalStatus.INACTIVE;
+		}
+		// TODO during review: What value of the spec. should be mapped to HISTORY_OF?
+		// http://www.hl7.org/fhir/valueset-condition-clinical.html
+		return ConditionClinicalStatus.HISTORY_OF;
+	}
+	
 	@Override
-	public Collection<Condition> searchForConditions(StringOrListParam name, StringOrListParam given,
-	        StringOrListParam family, SortSpec sort) {
+	public Collection<Condition> searchForConditions(ReferenceParam patientParam, ReferenceParam subjectParam,
+	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
+	        DateParam recordedData, SortSpec sort) {
 		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Condition.class);
 		
-		/*criteria.createAlias("patient", "pn");
-			criteria.createAlias("patient.names", "nm");*/
-		Criteria patientCriteria = criteria.createCriteria("patient");
-		handleNames(patientCriteria, /*"pn.nm",*/ name, given, family);
-		/*
-		handleIdentifier(criteria, identifier);
-		handleGender("gender", gender).ifPresent(criteria::add);
-		handleDateRange("birthdate", birthDate).ifPresent(criteria::add);
-		handleDateRange("deathdate", deathDate).ifPresent(criteria::add);
-		handleBoolean("dead", deceased).ifPresent(criteria::add);
-		handlePersonAddress("pad", city, state, postalCode, null).ifPresent(c -> {
-			criteria.createAlias("addresses", "pad");
-			criteria.add(c);
-		});
-		 */
+		handlePatientReference(criteria, patientParam);
+		// TODO during review: Do we require a ":Patient" modifier or a "Patient/" type for the "subject" search param?
+		// And do we want to support anything other than "Patient" under "subject" based searches (e.g., "Group")?
+		handlePatientReference(criteria, subjectParam);
+		handleDate("onsetDate", onsetDate).ifPresent(criteria::add);
+		// TODO: Handle onsetAge as well.
+		handleDate("dateCreated", recordedData).ifPresent(criteria::add);
+		handleOrListParam(clinicalStatus,
+		    tokenParam -> Optional.of(eq("clinicalStatus", convertStatus(tokenParam.getValue())))).ifPresent(criteria::add);
+		if (code != null) {
+			// TODO add support for code system as well (not just the code value), possibly using ConceptTranslator.
+			criteria.createAlias("condition.coded", "cd");
+			criteria.createAlias("cd.conceptMappings", "map");
+			criteria.createAlias("map.conceptReferenceTerm", "term");
+			handleOrListParam(code, tokenParam -> Optional.of(eq("term.code", tokenParam.getValue()))).ifPresent(criteria::add);
+		}
+		
 		handleSort(criteria, sort);
 		
 		return criteria.list();

@@ -233,6 +233,11 @@ public class FhirObservationDaoImplTest extends BaseModuleContextSensitiveTest {
 	@Test
 	public void searchForObs_shouldReturnObsByPatientGivenName() {
 		ReferenceParam patientReference = new ReferenceParam();
+		// TODO(bashir2): The `ReferenceParam::setValue` call resets `chain` to null
+		// hence in this (and other similar tests of this class) all (16) observations
+		// are returned and test assertions below are too permissive to catch this.
+		// One workaround is to use the `ReferenceParam` constructor that takes
+		// `chain` and `value` parameters.
 		patientReference.setChain(Patient.SP_GIVEN);
 		patientReference.setValue(PATIENT_GIVEN_NAME);
 		

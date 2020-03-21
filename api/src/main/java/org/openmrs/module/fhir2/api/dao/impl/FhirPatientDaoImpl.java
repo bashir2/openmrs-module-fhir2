@@ -80,6 +80,7 @@ public class FhirPatientDaoImpl extends BaseDaoImpl implements FhirPatientDao {
 		handleIdentifier(criteria, identifier);
 		handleGender("gender", gender).ifPresent(criteria::add);
 		handleDateRange("birthdate", birthDate).ifPresent(criteria::add);
+		// TODO: Fix the property and write unit-tests for it; `deathdate` is not a patient property.
 		handleDateRange("deathdate", deathDate).ifPresent(criteria::add);
 		handleBoolean("dead", deceased).ifPresent(criteria::add);
 		handlePersonAddress("pad", city, state, postalCode, null).ifPresent(c -> {
