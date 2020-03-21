@@ -16,12 +16,9 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.not;
-// TODO remove if not needed!
-// import static org.hamcrest.Matchers.equalTo;
-// import static org.hamcrest.Matchers.notNullValue;
-// import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 
+import java.text.SimpleDateFormat;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -38,8 +35,10 @@ import org.hibernate.SessionFactory;
 import org.hl7.fhir.r4.model.Patient;
 import org.junit.Before;
 import org.junit.Test;
+import org.openmrs.CodedOrFreeText;
 import org.openmrs.Condition;
 import org.openmrs.ConditionClinicalStatus;
+import org.openmrs.ConditionVerificationStatus;
 import org.openmrs.api.ConceptService;
 import org.openmrs.api.PatientService;
 import org.openmrs.module.fhir2.TestFhirSpringConfiguration;
@@ -57,7 +56,7 @@ public class FhirConditionDaoImpl_2_2Test extends BaseModuleContextSensitiveTest
 	
 	private static final String WRONG_CONDITION_UUID = "430bbb70-6a9c-4e1e-badb-9d1034b1b5e9";
 	
-	private static final String CONDITION_INITIAL_DATA_XML = "org/openmrs/module/fhir2/api/dao/impl/ConditionServiceImplTest_initial_data.xml";
+	private static final String CONDITION_INITIAL_DATA_XML = "org/openmrs/module/fhir2/api/dao/impl/FhirConditionDaoImplTest_initial_data.xml";
 	
 	// This is the UUID for person_id=2.
 	private static final String PATIENT_UUID = "da7f524f-27ce-4bb2-86d6-6d1d05312bd5";
@@ -271,8 +270,8 @@ public class FhirConditionDaoImpl_2_2Test extends BaseModuleContextSensitiveTest
 		assertThat(result, notNullValue());
 		assertThat(result.getUuid(), equalTo(CONDITION_UUID));
 	}
-	
-	/* TODO fix this before review, possibly by updating the input XML file
+
+	/* TODO comment out and fix before submit, once the conflicts in the initial_data.xml file are resolved.
 	@Test
 	public void shouldReturnExistingConditionIfBothAreEquals() throws Exception {
 		Condition condition = new Condition();
@@ -297,7 +296,7 @@ public class FhirConditionDaoImpl_2_2Test extends BaseModuleContextSensitiveTest
 		assertThat(result.getVerificationStatus(), equalTo(condition.getVerificationStatus()));
 	}
 	 */
-	
+
 	@Test
 	public void shouldUpdateExistingCondition() {
 		Condition condition = new Condition();
