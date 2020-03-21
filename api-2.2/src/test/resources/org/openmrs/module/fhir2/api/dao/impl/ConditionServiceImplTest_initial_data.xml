@@ -7,7 +7,8 @@
 
     Copyright (C) OpenMRS Inc. OpenMRS is a registered trademark and the OpenMRS
     graphic logo is a trademark of OpenMRS Inc.
-
+-->
+<!--
     Note this is copied from the following resource in openmrs-core repository
     then modified to meet the test requirements in this module:
     org/openmrs/api/include/ConditionServiceImplTest-SetupCondition.xml
@@ -31,7 +32,7 @@
 	<conditions condition_id="8" patient_id="6" clinical_status="ACTIVE" creator="1" date_created="2020-03-06 19:32:34"
 			voided="false" onset_date="2020-03-05 19:00:00" verification_status="CONFIRMED" condition_coded="5497"
 			uuid="db6f11a3-c52d-4e3c-bd0c-0a1d7df7d33c"/>
-	<conditions condition_id="9" patient_id="6" clinical_status="ACTIVE" creator="1" date_created="2020-03-07 19:32:34"
-			voided="false" onset_date="2020-03-06 19:00:00" verification_status="CONFIRMED" condition_coded="5089"
-			uuid="db6f11a3-c52d-4e3c-bd0c-0a1d7df7d000"/>
+	<conditions condition_id="9" patient_id="6" clinical_status="ACTIVE" creator="1" date_created="2020-03-14 19:32:34"
+			voided="false" onset_date="2020-03-13 19:00:00" verification_status="CONFIRMED" condition_coded="5089"
+			uuid="604953c5-b5c6-4e1e-be95-e37d8f392046"/>
 </dataset>
