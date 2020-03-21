@@ -28,4 +28,6 @@ public interface FhirConditionService {
 	Collection<Condition> searchConditions(ReferenceParam patientParam, ReferenceParam subjectParam, TokenOrListParam code,
 	        TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge, DateParam recordedDate,
 	        @Sort SortSpec sort);
+
+	Condition saveCondition(@NotNull Condition condition);
 }

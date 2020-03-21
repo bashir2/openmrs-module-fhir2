@@ -24,6 +24,8 @@ import org.openmrs.Patient;
 import org.openmrs.Person;
 import org.openmrs.module.fhir2.api.translators.ConceptTranslator;
 import org.openmrs.module.fhir2.api.translators.EncounterReferenceTranslator;
+import org.openmrs.module.fhir2.api.translators.ObservationBasedOnReferenceTranslator;
+import org.openmrs.module.fhir2.api.translators.ObservationEffectiveDatetimeTranslator;
 import org.openmrs.module.fhir2.api.translators.ObservationInterpretationTranslator;
 import org.openmrs.module.fhir2.api.translators.ObservationReferenceRangeTranslator;
 import org.openmrs.module.fhir2.api.translators.ObservationReferenceTranslator;
@@ -31,6 +33,7 @@ import org.openmrs.module.fhir2.api.translators.ObservationStatusTranslator;
 import org.openmrs.module.fhir2.api.translators.ObservationTranslator;
 import org.openmrs.module.fhir2.api.translators.ObservationValueTranslator;
 import org.openmrs.module.fhir2.api.translators.PatientReferenceTranslator;
+import org.openmrs.module.fhir2.api.translators.ProvenanceTranslator;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -60,6 +63,15 @@ public class ObservationTranslatorImpl implements ObservationTranslator {
 	
 	@Inject
 	private ObservationReferenceRangeTranslator referenceRangeTranslator;
+	
+	@Inject
+	private ProvenanceTranslator<Obs> provenanceTranslator;
+	
+	@Inject
+	private ObservationBasedOnReferenceTranslator basedOnReferenceTranslator;
+	
+	@Inject
+	private ObservationEffectiveDatetimeTranslator datetimeTranslator;
 	
 	@Override
 	public Observation toFhirResource(Obs observation) {
@@ -101,6 +113,11 @@ public class ObservationTranslatorImpl implements ObservationTranslator {
 			
 		}
 		obs.getMeta().setLastUpdated(observation.getDateChanged());
+		obs.addContained(provenanceTranslator.getCreateProvenance(observation));
+		obs.addContained(provenanceTranslator.getUpdateProvenance(observation));
+		obs.setIssued(observation.getDateCreated());
+		obs.setEffective(datetimeTranslator.toFhirResource(observation));
+		obs.addBasedOn(basedOnReferenceTranslator.toFhirResource(observation.getOrder()));
 		
 		return obs;
 	}
@@ -130,7 +147,11 @@ public class ObservationTranslatorImpl implements ObservationTranslator {
 		if (observation.getInterpretation().size() > 0) {
 			interpretationTranslator.toOpenmrsType(existingObs, observation.getInterpretation().get(0));
 		}
-		existingObs.setDateChanged(observation.getMeta().getLastUpdated());
+		datetimeTranslator.toOpenmrsType(existingObs, observation.getEffectiveDateTimeType());
+		
+		if (observation.hasBasedOn()) {
+			existingObs.setOrder(basedOnReferenceTranslator.toOpenmrsType(observation.getBasedOn().get(0)));
+		}
 		
 		return existingObs;
 	}

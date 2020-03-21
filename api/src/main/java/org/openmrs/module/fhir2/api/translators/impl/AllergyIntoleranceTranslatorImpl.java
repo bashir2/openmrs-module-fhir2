@@ -13,6 +13,7 @@ import javax.inject.Inject;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import lombok.AccessLevel;
 import lombok.Setter;
@@ -30,8 +31,10 @@ import org.openmrs.module.fhir2.FhirConstants;
 import org.openmrs.module.fhir2.api.FhirConceptService;
 import org.openmrs.module.fhir2.api.FhirGlobalPropertyService;
 import org.openmrs.module.fhir2.api.translators.AllergyIntoleranceTranslator;
+import org.openmrs.module.fhir2.api.translators.ConceptTranslator;
 import org.openmrs.module.fhir2.api.translators.PatientReferenceTranslator;
 import org.openmrs.module.fhir2.api.translators.PractitionerReferenceTranslator;
+import org.openmrs.module.fhir2.api.translators.ProvenanceTranslator;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -49,6 +52,14 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 	
 	@Inject
 	private FhirConceptService conceptService;
+	
+	@Inject
+	private ProvenanceTranslator<Allergy> provenanceTranslator;
+	
+	@Inject
+	private ConceptTranslator conceptTranslator;
+	
+	private Map<String, String> severityConceptUuids;
 	
 	@Override
 	public AllergyIntolerance toFhirResource(Allergy omrsAllergy) {
@@ -89,6 +100,8 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 		reactionComponent.setDescription(omrsAllergy.getReactionNonCoded());
 		reactionComponent.setSeverity(getFhirSeverity(omrsAllergy.getSeverity()));
 		allergy.addReaction(reactionComponent);
+		allergy.addContained(provenanceTranslator.getCreateProvenance(omrsAllergy));
+		allergy.addContained(provenanceTranslator.getUpdateProvenance(omrsAllergy));
 		
 		return allergy;
 	}
@@ -102,14 +115,13 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 		allergy.setUuid(fhirAllergy.getId());
 		if (allergy.getAllergen() == null) {
 			Allergen allergen = new Allergen();
-			if (!fhirAllergy.getCode().getCoding().isEmpty()) {
-				allergen.setCodedAllergen(
-				    conceptService.getConceptByUuid(fhirAllergy.getCode().getCoding().get(0).getCode()).orElse(null));
-				allergen.setNonCodedAllergen(fhirAllergy.getCode().getCoding().get(0).getDisplay());
+			if (fhirAllergy.hasCode()) {
+				allergen.setCodedAllergen(conceptTranslator.toOpenmrsType(fhirAllergy.getCode()));
+				allergen.setNonCodedAllergen(fhirAllergy.getCode().getText());
 			}
 			allergy.setAllergen(allergen);
 		}
-		if (fhirAllergy.getCategory().size() > 0) {
+		if (fhirAllergy.hasCategory()) {
 			switch (fhirAllergy.getCategory().get(0).getValue()) {
 				case MEDICATION:
 					allergy.getAllergen().setAllergenType(AllergenType.DRUG);
@@ -134,14 +146,14 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 		
 		List<AllergyReaction> reactions = new ArrayList<>();
 		
-		if (!fhirAllergy.getReaction().isEmpty()) {
+		if (fhirAllergy.hasReaction()) {
 			allergy.setSeverity(getOpenmrsSeverity(fhirAllergy.getReaction().get(0).getSeverity()));
 			
 			for (AllergyIntolerance.AllergyIntoleranceReactionComponent reaction : fhirAllergy.getReaction()) {
-				if (!reaction.getManifestation().isEmpty()) {
-					reactions.add(new AllergyReaction(allergy, conceptService
-					        .getConceptByUuid(reaction.getManifestation().get(0).getCoding().get(0).getCode()).orElse(null),
-					        reaction.getManifestation().get(0).getText()));
+				if (reaction.hasManifestation()) {
+					reactions.add(
+					    new AllergyReaction(allergy, conceptTranslator.toOpenmrsType(reaction.getManifestation().get(0)),
+					            reaction.getManifestation().get(0).getText()));
 				}
 			}
 		}
@@ -174,14 +186,19 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 	}
 	
 	private CodeableConcept getAllergySubstance(Allergen allergen) {
-		if (allergen.getCodedAllergen() == null) {
+		if (allergen == null) {
 			return null;
 		}
+		
 		CodeableConcept allergySubstance = new CodeableConcept();
-		Coding code = new Coding(FhirConstants.ALLERGY_SUBSTANCE_VALUE_SET_URI, allergen.getCodedAllergen().getUuid(),
-		        allergen.getNonCodedAllergen());
-		allergySubstance.addCoding(code);
-		allergySubstance.setText(allergen.getNonCodedAllergen());
+		
+		if (allergen.getCodedAllergen() != null) {
+			allergySubstance = conceptTranslator.toFhirResource(allergen.getCodedAllergen());
+		}
+		
+		if (allergen.getNonCodedAllergen() != null) {
+			allergySubstance.setText(allergen.getNonCodedAllergen());
+		}
 		
 		return allergySubstance;
 	}
@@ -203,14 +220,17 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 			return null;
 		}
 		
-		if (globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_MILD, "")
-		        .equals(severityConcept.getUuid())) {
+		Map<String, String> severityConceptUuids = getSeverityConceptUuids();
+		
+		if (severityConceptUuids.isEmpty()) {
+			return null;
+		}
+		
+		if (severityConcept.getUuid().equals(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_MILD))) {
 			return AllergyIntolerance.AllergyIntoleranceSeverity.MILD;
-		} else if (globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_MODERATE, "")
-		        .equals(severityConcept.getUuid())) {
+		} else if (severityConcept.getUuid().equals(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_MODERATE))) {
 			return AllergyIntolerance.AllergyIntoleranceSeverity.MODERATE;
-		} else if (globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_SEVERE, "")
-		        .equals(severityConcept.getUuid())) {
+		} else if (severityConcept.getUuid().equals(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_SEVERE))) {
 			return AllergyIntolerance.AllergyIntoleranceSeverity.SEVERE;
 		} else {
 			return AllergyIntolerance.AllergyIntoleranceSeverity.NULL;
@@ -218,30 +238,36 @@ public class AllergyIntoleranceTranslatorImpl extends AbstractReferenceHandlingT
 	}
 	
 	private Concept getOpenmrsSeverity(AllergyIntolerance.AllergyIntoleranceSeverity severity) {
-		Concept concept;
+		if (severity == null) {
+			return null;
+		}
+		
+		Map<String, String> severityConceptUuids = getSeverityConceptUuids();
+		
+		if (severityConceptUuids.isEmpty()) {
+			return null;
+		}
+		
 		switch (severity) {
 			case MILD:
-				concept = conceptService
-				        .getConceptByUuid(globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_MILD))
+				return conceptService.getConceptByUuid(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_MILD))
 				        .orElse(null);
-				break;
 			case MODERATE:
-				concept = conceptService
-				        .getConceptByUuid(globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_MODERATE))
+				return conceptService.getConceptByUuid(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_MODERATE))
 				        .orElse(null);
-				break;
 			case SEVERE:
-				concept = conceptService
-				        .getConceptByUuid(globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_SEVERE))
+				return conceptService.getConceptByUuid(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_SEVERE))
 				        .orElse(null);
-				break;
 			case NULL:
 			default:
-				concept = conceptService
-				        .getConceptByUuid(globalPropertyService.getGlobalProperty(FhirConstants.GLOBAL_PROPERTY_OTHER))
+				return conceptService.getConceptByUuid(severityConceptUuids.get(FhirConstants.GLOBAL_PROPERTY_OTHER))
 				        .orElse(null);
 		}
-		return concept;
 	}
 	
+	private Map<String, String> getSeverityConceptUuids() {
+		return globalPropertyService.getGlobalProperties(FhirConstants.GLOBAL_PROPERTY_MILD,
+		    FhirConstants.GLOBAL_PROPERTY_MODERATE, FhirConstants.GLOBAL_PROPERTY_SEVERE,
+		    FhirConstants.GLOBAL_PROPERTY_OTHER);
+	}
 }

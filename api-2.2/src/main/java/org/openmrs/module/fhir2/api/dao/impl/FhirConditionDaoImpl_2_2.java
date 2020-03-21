@@ -25,6 +25,11 @@ import ca.uhn.fhir.rest.param.TokenOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.Criteria;
+import java.util.Date;
+
+import lombok.AccessLevel;
+import lombok.Setter;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.openmrs.Condition;
 import org.openmrs.ConditionClinicalStatus;
@@ -66,7 +71,7 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
 	        DateParam recordedData, SortSpec sort) {
 		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Condition.class);
-		
+
 		handlePatientReference(criteria, patientParam);
 		// TODO during review: Do we require a ":Patient" modifier or a "Patient/" type for the "subject" search param?
 		// And do we want to support anything other than "Patient" under "subject" based searches (e.g., "Group")?
@@ -75,18 +80,54 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 		// TODO: Handle onsetAge as well.
 		handleDate("dateCreated", recordedData).ifPresent(criteria::add);
 		handleOrListParam(clinicalStatus,
-		    tokenParam -> Optional.of(eq("clinicalStatus", convertStatus(tokenParam.getValue())))).ifPresent(criteria::add);
+				tokenParam -> Optional.of(eq("clinicalStatus", convertStatus(tokenParam.getValue()))))
+				.ifPresent(criteria::add);
 		if (code != null) {
 			// TODO add support for code system as well (not just the code value), possibly using ConceptTranslator.
 			criteria.createAlias("condition.coded", "cd");
 			criteria.createAlias("cd.conceptMappings", "map");
 			criteria.createAlias("map.conceptReferenceTerm", "term");
 			handleOrListParam(code, tokenParam -> Optional.of(eq("term.code", tokenParam.getValue())))
-			        .ifPresent(criteria::add);
+					.ifPresent(criteria::add);
+		}
+
+		handleSort(criteria, sort);
+
+		return criteria.list();
+	}
+
+	@Override
+	public Condition saveCondition(Condition condition) {
+		Session session = sessionFactory.getCurrentSession();
+		Date endDate = condition.getEndDate() != null ? condition.getEndDate() : new Date();
+		if (condition.getEndReason() != null) {
+			condition.setEndDate(endDate);
 		}
 		
-		handleSort(criteria, sort);
+		Condition existingCondition = getConditionByUuid(condition.getUuid());
+		if (condition.equals(existingCondition)) {
+			return existingCondition;
+		}
+		if (existingCondition == null) {
+			session.saveOrUpdate(condition);
+			return condition;
+		}
 		
-		return criteria.list();
+		condition = Condition.newInstance(condition);
+		condition.setPreviousVersion(existingCondition);
+		
+		if (existingCondition.getClinicalStatus().equals(condition.getClinicalStatus())) {
+			existingCondition.setVoided(true);
+			session.saveOrUpdate(existingCondition);
+			session.saveOrUpdate(condition);
+			return condition;
+		}
+		Date onSetDate = condition.getOnsetDate() != null ? condition.getOnsetDate() : new Date();
+		existingCondition.setEndDate(onSetDate);
+		session.saveOrUpdate(existingCondition);
+		condition.setOnsetDate(onSetDate);
+		session.saveOrUpdate(condition);
+		
+		return condition;
 	}
 }

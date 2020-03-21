@@ -10,6 +10,7 @@
 package org.openmrs.module.fhir2.web.servlet;
 
 import static org.springframework.http.HttpHeaders.ACCEPT;
+import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import javax.servlet.ServletConfig;
 import javax.servlet.ServletException;
@@ -36,13 +37,16 @@ import org.hl7.fhir.r4.model.Bundle;
 import org.hl7.fhir.r4.model.OperationOutcome;
 import org.junit.Before;
 import org.junit.BeforeClass;
+import org.openmrs.api.APIException;
 import org.openmrs.module.fhir2.FhirConstants;
+import org.openmrs.module.fhir2.api.impl.FhirGlobalPropertyServiceImpl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockServletConfig;
 import org.springframework.mock.web.MockServletContext;
+import org.springframework.transaction.annotation.Transactional;
 
 public abstract class BaseFhirResourceProviderTest<T extends IResourceProvider, U extends IBaseResource> {
 	
@@ -72,6 +76,10 @@ public abstract class BaseFhirResourceProviderTest<T extends IResourceProvider, 
 		return statusEquals(HttpStatus.BAD_REQUEST);
 	}
 	
+	public static Matcher<MockHttpServletResponse> isMethodNotAllowed() {
+		return statusEquals(HttpStatus.METHOD_NOT_ALLOWED);
+	}
+	
 	public static Matcher<MockHttpServletResponse> statusEquals(final int status) {
 		return new StatusEqualsMatcher(status);
 	}
@@ -96,15 +104,19 @@ public abstract class BaseFhirResourceProviderTest<T extends IResourceProvider, 
 		servlet = new FhirRestServlet();
 		servlet.setFhirContext(FhirContext.forR4());
 		servlet.setLoggingInterceptor(interceptor);
-		servlet.setGlobalPropertyService(property -> {
-			switch (property) {
-				case FhirConstants.OPENMRS_FHIR_DEFAULT_PAGE_SIZE:
-					return "10";
-				case FhirConstants.OPENMRS_FHIR_MAXIMUM_PAGE_SIZE:
-					return "100";
-			}
+		servlet.setGlobalPropertyService(new FhirGlobalPropertyServiceImpl() {
 			
-			return null;
+			@Override
+			@Transactional(readOnly = true)
+			public String getGlobalProperty(String property) throws APIException {
+				switch (property) {
+					case FhirConstants.OPENMRS_FHIR_DEFAULT_PAGE_SIZE:
+						return "10";
+					case FhirConstants.OPENMRS_FHIR_MAXIMUM_PAGE_SIZE:
+						return "100";
+				}
+				return null;
+			}
 		});
 		servlet.setResourceProviders(getResourceProvider());
 		servlet.init(servletConfig);
@@ -221,6 +233,12 @@ public abstract class BaseFhirResourceProviderTest<T extends IResourceProvider, 
 		
 		public FhirRequestBuilder accept(@NotNull MediaType mediaType) {
 			request.addHeader(ACCEPT, mediaType.toString());
+			return this;
+		}
+		
+		public FhirRequestBuilder jsonContent(@NotNull String json) {
+			request.addHeader(CONTENT_TYPE, FhirMediaTypes.JSON.toString());
+			request.setContent(json.getBytes());
 			return this;
 		}
 		

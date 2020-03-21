@@ -12,6 +12,10 @@ package org.openmrs.module.fhir2.providers;
 import javax.inject.Inject;
 import javax.validation.constraints.NotNull;
 
+import java.util.List;
+
+import ca.uhn.fhir.rest.annotation.Create;
+import ca.uhn.fhir.rest.annotation.History;
 import ca.uhn.fhir.rest.annotation.IdParam;
 import ca.uhn.fhir.rest.annotation.OptionalParam;
 import ca.uhn.fhir.rest.annotation.Read;
@@ -22,6 +26,8 @@ import ca.uhn.fhir.rest.param.DateParam;
 import ca.uhn.fhir.rest.param.QuantityParam;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
+import ca.uhn.fhir.rest.annotation.ResourceParam;
+import ca.uhn.fhir.rest.api.MethodOutcome;
 import ca.uhn.fhir.rest.server.IResourceProvider;
 import ca.uhn.fhir.rest.server.exceptions.ResourceNotFoundException;
 import lombok.AccessLevel;
@@ -32,7 +38,10 @@ import org.hl7.fhir.r4.model.Condition;
 import org.hl7.fhir.r4.model.IdType;
 import org.hl7.fhir.r4.model.Patient;
 import org.openmrs.module.fhir2.api.FhirConditionService;
-import org.openmrs.module.fhir2.util.FhirUtils;
+import org.openmrs.module.fhir2.util.FhirServerUtils;
+import org.hl7.fhir.r4.model.Resource;
+import org.openmrs.module.fhir2.api.FhirConditionService;
+import org.openmrs.module.fhir2.util.FhirServerUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -70,8 +79,23 @@ public class ConditionFhirResourceProvider implements IResourceProvider {
 	        @OptionalParam(name = Condition.SP_ONSET_DATE) DateParam onsetDate,
 	        @OptionalParam(name = Condition.SP_ONSET_AGE) QuantityParam onsetAge,
 	        @OptionalParam(name = Condition.SP_RECORDED_DATE) DateParam recordedDate, @Sort SortSpec sort) {
-		return FhirUtils.convertSearchResultsToBundle(conditionService.searchConditions(patientParam, subjectParam, code,
+		return FhirServerUtils.convertSearchResultsToBundle(conditionService.searchConditions(patientParam, subjectParam, code,
 		    clinicalStatus, onsetDate, onsetAge, recordedDate, sort));
 	}
 	
+	@History
+	@SuppressWarnings("unused")
+	public List<Resource> getConditionHistoryById(@IdParam @NotNull IdType id) {
+		Condition condition = conditionService.getConditionByUuid(id.getIdPart());
+		if (condition == null) {
+			throw new ResourceNotFoundException("Could not find condition with Id " + id.getIdPart());
+		}
+		return condition.getContained();
+	}
+	
+	@Create
+	@SuppressWarnings("unused")
+	public MethodOutcome createCondition(@ResourceParam Condition newCondition) {
+		return FhirServerUtils.buildCreate(conditionService.saveCondition(newCondition));
+	}
 }

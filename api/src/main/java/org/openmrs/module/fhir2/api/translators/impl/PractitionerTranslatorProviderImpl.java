@@ -31,6 +31,7 @@ import org.openmrs.module.fhir2.FhirConstants;
 import org.openmrs.module.fhir2.api.FhirGlobalPropertyService;
 import org.openmrs.module.fhir2.api.dao.FhirPractitionerDao;
 import org.openmrs.module.fhir2.api.translators.AddressTranslator;
+import org.openmrs.module.fhir2.api.translators.CustomizableMetadataTranslator;
 import org.openmrs.module.fhir2.api.translators.GenderTranslator;
 import org.openmrs.module.fhir2.api.translators.PersonNameTranslator;
 import org.openmrs.module.fhir2.api.translators.PractitionerTranslator;
@@ -58,6 +59,9 @@ public class PractitionerTranslatorProviderImpl implements PractitionerTranslato
 	
 	@Inject
 	private FhirGlobalPropertyService globalPropertyService;
+	
+	@Inject
+	private CustomizableMetadataTranslator<ProviderAttribute, Provider> customizableMetadataTranslator;
 	
 	@Override
 	public Provider toOpenmrsType(Provider existingProvider, Practitioner practitioner) {
@@ -110,6 +114,8 @@ public class PractitionerTranslatorProviderImpl implements PractitionerTranslato
 			}
 		}
 		practitioner.getMeta().setLastUpdated(provider.getDateChanged());
+		practitioner.addContained(customizableMetadataTranslator.getCreateProvenance(provider));
+		practitioner.addContained(customizableMetadataTranslator.getUpdateProvenance(provider));
 		
 		return practitioner;
 	}

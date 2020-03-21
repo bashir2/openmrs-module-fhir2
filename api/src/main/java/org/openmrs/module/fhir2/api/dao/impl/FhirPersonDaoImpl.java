@@ -28,24 +28,20 @@ import org.hibernate.SessionFactory;
 import org.hibernate.sql.JoinType;
 import org.openmrs.Person;
 import org.openmrs.PersonAttribute;
-import org.openmrs.api.PersonService;
 import org.openmrs.module.fhir2.api.dao.FhirPersonDao;
 import org.springframework.stereotype.Component;
 
 @Component
 @Setter(AccessLevel.PACKAGE)
-public class FhirPersonDaoImpl extends BaseDaoImpl implements FhirPersonDao {
-	
-	@Inject
-	PersonService personService;
+public class FhirPersonDaoImpl extends AbstractPersonDaoImpl implements FhirPersonDao {
 	
 	@Inject
 	@Named("sessionFactory")
-	SessionFactory sessionFactory;
+	private SessionFactory sessionFactory;
 	
 	@Override
 	public Person getPersonByUuid(String uuid) {
-		return personService.getPersonByUuid(uuid);
+		return (Person) sessionFactory.getCurrentSession().createCriteria(Person.class).add(eq("uuid", uuid)).uniqueResult();
 	}
 	
 	@Override
@@ -70,37 +66,14 @@ public class FhirPersonDaoImpl extends BaseDaoImpl implements FhirPersonDao {
 			criteria.createAlias("addresses", "pad");
 			criteria.add(c);
 		});
-		if (sort != null) {
-			if (sort.getParamName().equals("name") && !containsAlias(criteria, "pn")) {
-				criteria.createAlias("names", "pn");
-			}
-			if (sort.getParamName().startsWith("address") && !containsAlias(criteria, "pad")) {
-				criteria.createAlias("addresses", "pad");
-			}
-		}
+		
 		handleSort(criteria, sort);
 		
 		return criteria.list();
 	}
 	
 	@Override
-	protected String paramToProp(String param) {
-		switch (param) {
-			case "name":
-				return "pn.givenName";
-			case "birthdate":
-				return "birthdate";
-			case "address-city":
-				return "pad.cityVillage";
-			case "address-state":
-				return "pad.stateProvince";
-			case "address-postalCode":
-				return "pad.postalCode";
-			case "address-country":
-				return "pad.country";
-			default:
-				return null;
-		}
+	protected String getSqlAlias() {
+		return "this_";
 	}
-	
 }

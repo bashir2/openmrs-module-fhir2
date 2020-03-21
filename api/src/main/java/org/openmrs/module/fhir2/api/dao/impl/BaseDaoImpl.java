@@ -11,16 +11,19 @@ package org.openmrs.module.fhir2.api.dao.impl;
 
 import static org.hibernate.criterion.Order.asc;
 import static org.hibernate.criterion.Order.desc;
+import static org.hibernate.criterion.Projections.property;
 import static org.hibernate.criterion.Restrictions.and;
 import static org.hibernate.criterion.Restrictions.eq;
 import static org.hibernate.criterion.Restrictions.ge;
 import static org.hibernate.criterion.Restrictions.gt;
 import static org.hibernate.criterion.Restrictions.ilike;
 import static org.hibernate.criterion.Restrictions.in;
+import static org.hibernate.criterion.Restrictions.isNull;
 import static org.hibernate.criterion.Restrictions.le;
 import static org.hibernate.criterion.Restrictions.lt;
 import static org.hibernate.criterion.Restrictions.not;
 import static org.hibernate.criterion.Restrictions.or;
+import static org.hibernate.criterion.Subqueries.propertyEq;
 
 import javax.validation.constraints.NotNull;
 
@@ -28,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
@@ -44,6 +48,7 @@ import ca.uhn.fhir.model.api.IQueryParameterAnd;
 import ca.uhn.fhir.model.api.IQueryParameterOr;
 import ca.uhn.fhir.model.api.IQueryParameterType;
 import ca.uhn.fhir.model.api.TemporalPrecisionEnum;
+import ca.uhn.fhir.rest.api.SortOrderEnum;
 import ca.uhn.fhir.rest.api.SortSpec;
 import ca.uhn.fhir.rest.param.DateParam;
 import ca.uhn.fhir.rest.param.DateRangeParam;
@@ -52,10 +57,15 @@ import ca.uhn.fhir.rest.param.StringOrListParam;
 import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
 import ca.uhn.fhir.rest.param.TokenParam;
+import lombok.Builder;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.commons.lang3.time.DateUtils;
 import org.hibernate.Criteria;
 import org.hibernate.criterion.Criterion;
+import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.MatchMode;
 import org.hibernate.criterion.Order;
 import org.hibernate.internal.CriteriaImpl;
@@ -65,6 +75,7 @@ import org.hl7.fhir.r4.model.Location;
 import org.hl7.fhir.r4.model.Patient;
 import org.hl7.fhir.r4.model.Practitioner;
 import org.hl7.fhir.r4.model.codesystems.AdministrativeGender;
+import org.openmrs.module.fhir2.FhirConceptSource;
 
 /**
  * <p>
@@ -339,13 +350,17 @@ public abstract class BaseDaoImpl {
 		// the string matches "true". We could potentially be passed a non-valid Boolean value here.
 		return handleOrListParam(booleanToken, token -> {
 			if (token.getValue().equalsIgnoreCase("true")) {
-				return Optional.of(eq(propertyName, true));
+				return handleBooleanProperty(propertyName, true);
 			} else if (token.getValue().equalsIgnoreCase("false")) {
-				return Optional.of(eq(propertyName, false));
+				return handleBooleanProperty(propertyName, false);
 			}
 			
 			return Optional.empty();
 		});
+	}
+	
+	protected Optional<Criterion> handleBooleanProperty(String propertyName, boolean booleanVal) {
+		return Optional.of(eq(propertyName, booleanVal));
 	}
 	
 	/**
@@ -426,21 +441,23 @@ public abstract class BaseDaoImpl {
 		return handleOrListParam(gender, token -> {
 			try {
 				AdministrativeGender administrativeGender = AdministrativeGender.fromCode(token.getValue());
+				if (administrativeGender == null) {
+					return Optional.of(isNull(propertyName));
+				}
 				switch (administrativeGender) {
 					case MALE:
 						return Optional.of(ilike(propertyName, "M", MatchMode.EXACT));
 					case FEMALE:
 						return Optional.of(ilike(propertyName, "F", MatchMode.EXACT));
 					case OTHER:
-						return Optional.of(not(or(eq(propertyName, "M"), eq(propertyName, "F"))));
 					case UNKNOWN:
 					case NULL:
-						return Optional.empty();
+						return Optional.of(isNull(propertyName));
 				}
 			}
 			catch (FHIRException ignored) {}
 			
-			return Optional.empty();
+			return Optional.of(ilike(propertyName, token.getValue(), MatchMode.EXACT));
 		});
 	}
 	
@@ -635,24 +652,29 @@ public abstract class BaseDaoImpl {
 		return Optional.of(or(toCriteriaArray(criterionList.stream())));
 	}
 	
+	/**
+	 * Use this method to properly implement sorting for your query. Note that for this method to work,
+	 * you must override one or more of: {@link #paramToProps(SortState)},
+	 * {@link #paramToProps(String)}, or {@link #paramToProp(String)}.
+	 *
+	 * @param criteria the current criteria
+	 * @param sort the {@link SortSpec} which defines the sorting to be translated
+	 */
 	protected void handleSort(Criteria criteria, SortSpec sort) {
-		handleSort(sort, this::paramToProp).ifPresent(l -> l.forEach(criteria::addOrder));
+		handleSort(criteria, sort, this::paramToProps).ifPresent(l -> l.forEach(criteria::addOrder));
 	}
 	
-	protected Optional<List<Order>> handleSort(SortSpec sort, Function<String, String> paramToProp) {
+	protected Optional<List<Order>> handleSort(Criteria criteria, SortSpec sort,
+	        Function<SortState, Collection<Order>> paramToProp) {
 		List<Order> orderings = new ArrayList<>();
 		SortSpec sortSpec = sort;
 		while (sortSpec != null) {
-			String prop = paramToProp.apply(sortSpec.getParamName());
-			if (prop != null) {
-				switch (sortSpec.getOrder()) {
-					case DESC:
-						orderings.add(desc(prop));
-						break;
-					case ASC:
-						orderings.add(asc(prop));
-						break;
-				}
+			SortState state = SortState.builder().criteria(criteria).sortOrder(sortSpec.getOrder())
+			        .parameter(sortSpec.getParamName().toLowerCase()).build();
+			
+			Collection<Order> orders = paramToProp.apply(state);
+			if (orders != null) {
+				orderings.addAll(orders);
 			}
 			
 			sortSpec = sortSpec.getChain();
@@ -660,17 +682,105 @@ public abstract class BaseDaoImpl {
 		
 		if (orderings.size() == 0) {
 			return Optional.empty();
+		}
+		
+		return Optional.of(orderings);
+	}
+	
+	protected Criterion generateSystemQuery(String system, List<String> codes) {
+		DetachedCriteria conceptSourceCriteria = DetachedCriteria.forClass(FhirConceptSource.class).add(eq("url", system))
+		        .setProjection(property("conceptSource"));
+		
+		if (codes.size() > 1) {
+			return and(propertyEq("crt.conceptSource", conceptSourceCriteria), in("crt.code", codes));
 		} else {
-			return Optional.of(orderings);
+			return and(propertyEq("crt.conceptSource", conceptSourceCriteria), eq("crt.code", codes.get(0)));
 		}
 	}
 	
+	protected void handleResourceCode(Criteria criteria, TokenOrListParam code, @NotNull String conceptAlias,
+	        @NotNull String conceptMapAlias, @NotNull String conceptReferenceTermAlias) {
+		
+		handleOrListParamBySystem(code, (system, tokens) -> {
+			if (system.isEmpty()) {
+				return Optional.of(or(
+				    in(String.format("%s.conceptId", conceptAlias),
+				        tokensToParams(tokens).map(NumberUtils::toInt).collect(Collectors.toList())),
+				    in(String.format("%s.uuid", conceptAlias), tokensToList(tokens))));
+			} else {
+				if (!containsAlias(criteria, conceptMapAlias)) {
+					criteria.createAlias(String.format("%s.conceptMappings", conceptAlias), conceptMapAlias).createAlias(
+					    String.format("%s.conceptReferenceTerm", conceptMapAlias), conceptReferenceTermAlias);
+				}
+				
+				return Optional.of(generateSystemQuery(system, tokensToList(tokens)));
+			}
+		}).ifPresent(criteria::add);
+	}
+	
+	protected TokenOrListParam convertStringStatusToBoolean(TokenOrListParam statusParam) {
+		if (statusParam != null) {
+			return handleOrListParam(statusParam).map(s -> {
+				switch (s.getValue()) {
+					case "active":
+						return Optional.of("false");
+					case "inactive":
+						return Optional.of("true");
+					default:
+						return Optional.empty();
+				}
+			}).filter(Optional::isPresent).map(Optional::get).collect(TokenOrListParam::new,
+			    (tp, v) -> tp.add(String.valueOf(v)), (tp1, tp2) -> tp2.getListAsCodings().forEach(tp1::add));
+		}
+		
+		return null;
+	}
+	
 	/**
-	 * This function should be overridden by implementations. It exists to map a FHIR parameter value to
-	 * the corresponding property name. This is used to correctly sort the returned results.
+	 * This function should be overridden by implementations. It is used to map FHIR parameter names to
+	 * their corresponding values in the query.
 	 *
-	 * @param param the name of the FHIR parameter
-	 * @return the corresponding property in the query
+	 * @param sortState a {@link SortState} object describing the current sort state
+	 * @return the corresponding ordering(s) needed for this property
+	 */
+	protected Collection<Order> paramToProps(@NotNull SortState sortState) {
+		Collection<String> prop = paramToProps(sortState.getParameter());
+		
+		if (prop != null) {
+			switch (sortState.getSortOrder()) {
+				case ASC:
+					return prop.stream().map(Order::asc).collect(Collectors.toList());
+				case DESC:
+					return prop.stream().map(Order::desc).collect(Collectors.toList());
+			}
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * This function should be overridden by implementations. It is used to map FHIR parameter names to
+	 * properties where there is only a single property.
+	 *
+	 * @param param the FHIR parameter to map
+	 * @return the name of the corresponding property from the current query
+	 */
+	protected Collection<String> paramToProps(@NotNull String param) {
+		String prop = paramToProp(param);
+		
+		if (prop != null) {
+			return Collections.singleton(prop);
+		}
+		
+		return null;
+	}
+	
+	/**
+	 * This function should be overridden by implementations. It is used to map FHIR parameter names to
+	 * properties where there is only a single property.
+	 *
+	 * @param param the FHIR parameter to map
+	 * @return the name of the corresponding property from the current query
 	 */
 	protected String paramToProp(@NotNull String param) {
 		return null;
@@ -693,9 +803,9 @@ public abstract class BaseDaoImpl {
 			return Optional.of(ilike(propertyName, param.getValue(), MatchMode.EXACT));
 		} else if (param.isContains()) {
 			return Optional.of(ilike(propertyName, param.getValue(), MatchMode.ANYWHERE));
-		} else {
-			return Optional.of(ilike(propertyName, param.getValue(), MatchMode.START));
 		}
+		
+		return Optional.of(ilike(propertyName, param.getValue(), MatchMode.START));
 	}
 	
 	protected Optional<CriteriaImpl> asImpl(Criteria criteria) {
@@ -703,9 +813,9 @@ public abstract class BaseDaoImpl {
 			return Optional.of((CriteriaImpl) criteria);
 		} else if (CriteriaImpl.Subcriteria.class.isAssignableFrom(criteria.getClass())) {
 			return Optional.of((CriteriaImpl) ((CriteriaImpl.Subcriteria) criteria).getParent());
-		} else {
-			return Optional.empty();
 		}
+		
+		return Optional.empty();
 	}
 	
 	protected List<String> tokensToList(List<TokenParam> tokens) {
@@ -736,4 +846,20 @@ public abstract class BaseDaoImpl {
 	protected Criterion[] toCriteriaArray(Stream<Optional<Criterion>> criteriaStream) {
 		return criteriaStream.filter(Optional::isPresent).map(Optional::get).toArray(Criterion[]::new);
 	}
+	
+	/**
+	 * This object is used to pass around the state of the sorting where that's needed.
+	 */
+	@Data
+	@Builder
+	@EqualsAndHashCode
+	public static final class SortState {
+		
+		private Criteria criteria;
+		
+		private SortOrderEnum sortOrder;
+		
+		private String parameter;
+	}
+	
 }

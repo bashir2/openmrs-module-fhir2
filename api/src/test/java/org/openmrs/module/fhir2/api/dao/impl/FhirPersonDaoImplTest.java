@@ -14,15 +14,25 @@ import static org.exparity.hamcrest.date.DateMatchers.sameOrBefore;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
+import static org.hl7.fhir.r4.model.Person.SP_ADDRESS_CITY;
+import static org.hl7.fhir.r4.model.Person.SP_ADDRESS_COUNTRY;
+import static org.hl7.fhir.r4.model.Person.SP_ADDRESS_POSTALCODE;
+import static org.hl7.fhir.r4.model.Person.SP_ADDRESS_STATE;
+import static org.hl7.fhir.r4.model.Person.SP_BIRTHDATE;
+import static org.hl7.fhir.r4.model.Person.SP_NAME;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.openmrs.util.OpenmrsUtil.compareWithNullAsGreatest;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -32,7 +42,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.List;
 
 import ca.uhn.fhir.rest.api.SortOrderEnum;
@@ -42,12 +51,13 @@ import ca.uhn.fhir.rest.param.StringOrListParam;
 import ca.uhn.fhir.rest.param.StringParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
 import org.exparity.hamcrest.date.DateMatchers;
+import org.hamcrest.comparator.ComparatorMatcherBuilder;
 import org.hibernate.SessionFactory;
 import org.junit.Before;
 import org.junit.Test;
 import org.openmrs.Person;
 import org.openmrs.PersonAttribute;
-import org.openmrs.api.PersonService;
+import org.openmrs.PersonName;
 import org.openmrs.module.fhir2.TestFhirSpringConfiguration;
 import org.openmrs.test.BaseModuleContextSensitiveTest;
 import org.springframework.test.context.ContextConfiguration;
@@ -61,9 +71,17 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	
 	private static final String PERSON_INITIAL_DATA_XML = "org/openmrs/module/fhir2/api/dao/impl/FhirPersonDaoImplTest_initial_data.xml";
 	
-	private static final String GENDER = "M";
+	private static final String MALE_GENDER = "male";
 	
-	private static final String WRONG_GENDER = "other";
+	private static final String FEMALE_GENDER = "female";
+	
+	private static final String OTHER_GENDER = "other";
+	
+	private static final String UNKNOWN_GENDER = "unknown";
+	
+	private static final String NULL_GENDER = null;
+	
+	private static final String WRONG_GENDER = "wrong-gender";
 	
 	private static final String GIVEN_NAME = "John";
 	
@@ -91,11 +109,39 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	
 	private static final String PERSON_ADDRESS_PERSON_UUID = "61b38324-e2fd-4feb-95b7-9e9a2a4400df";
 	
-	private FhirPersonDaoImpl fhirPersonDao;
+	private static final ComparatorMatcherBuilder<PersonName> NAME_MATCHER = ComparatorMatcherBuilder
+	        .comparedBy((o1, o2) -> {
+		        int ret;
+		        ret = compareWithNullAsGreatest(o1.getFamilyName(), o2.getFamilyName());
+		        
+		        if (ret == 0) {
+			        ret = compareWithNullAsGreatest(o1.getFamilyName2(), o2.getFamilyName2());
+		        }
+		        
+		        if (ret == 0) {
+			        ret = compareWithNullAsGreatest(o1.getGivenName(), o2.getGivenName());
+		        }
+		        
+		        if (ret == 0) {
+			        ret = compareWithNullAsGreatest(o1.getMiddleName(), o2.getMiddleName());
+		        }
+		        
+		        if (ret == 0) {
+			        ret = compareWithNullAsGreatest(o1.getFamilyNamePrefix(), o2.getFamilyNamePrefix());
+		        }
+		        
+		        if (ret == 0) {
+			        ret = compareWithNullAsGreatest(o1.getFamilyNameSuffix(), o2.getFamilyNameSuffix());
+		        }
+		        
+		        if (ret == 0) {
+			        ret = o1.equalsContent(o2) ? 0 : -1;
+		        }
+		        
+		        return ret;
+	        });
 	
-	@Inject
-	@Named("personService")
-	private Provider<PersonService> personServiceProvider;
+	private FhirPersonDaoImpl fhirPersonDao;
 	
 	@Inject
 	@Named("sessionFactory")
@@ -104,7 +150,6 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	@Before
 	public void setup() throws Exception {
 		fhirPersonDao = new FhirPersonDaoImpl();
-		fhirPersonDao.setPersonService(personServiceProvider.get());
 		fhirPersonDao.setSessionFactory(sessionFactoryProvider.get());
 		executeDataSet(PERSON_INITIAL_DATA_XML);
 	}
@@ -114,7 +159,7 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 		Person person = fhirPersonDao.getPersonByUuid(PERSON_UUID);
 		assertNotNull(person);
 		assertEquals(person.getUuid(), PERSON_UUID);
-		assertEquals(person.getGender(), GENDER);
+		assertEquals(person.getGender(), "M");
 		assertEquals(person.getGivenName(), GIVEN_NAME);
 	}
 	
@@ -154,14 +199,41 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	
 	@Test
 	public void shouldReturnCollectionOfPeopleForMatchingGender() {
-		TokenOrListParam tokenOrListParam = new TokenOrListParam().add(GENDER);
-		Collection<Person> people = fhirPersonDao.searchForPeople(null, tokenOrListParam, null, null, null, null, null,
+		final String GENDER_PROPERTY = "gender";
+		Collection<Person> people = fhirPersonDao.searchForPeople(null, new TokenOrListParam().add(MALE_GENDER), null, null,
+		    null, null, null, null);
+		
+		assertThat(people, notNullValue());
+		assertThat(people, not(empty()));
+		assertThat(people, everyItem(hasProperty(GENDER_PROPERTY, equalTo("M"))));
+		
+		people = fhirPersonDao.searchForPeople(null, new TokenOrListParam().add(FEMALE_GENDER), null, null, null, null, null,
 		    null);
 		
 		assertThat(people, notNullValue());
-		assertThat(people.size(), greaterThanOrEqualTo(1));
-		assertThat(people.stream().findAny().isPresent(), is(true));
-		assertThat(people.stream().findAny().get().getGender(), equalTo(GENDER));
+		assertThat(people, not(empty()));
+		assertThat(people, everyItem(hasProperty(GENDER_PROPERTY, equalTo("F"))));
+		
+		people = fhirPersonDao.searchForPeople(null, new TokenOrListParam().add(OTHER_GENDER), null, null, null, null, null,
+		    null);
+		
+		assertThat(people, notNullValue());
+		assertThat(people, not(empty()));
+		assertThat(people, everyItem(hasProperty(GENDER_PROPERTY, nullValue())));
+		
+		people = fhirPersonDao.searchForPeople(null, new TokenOrListParam().add(NULL_GENDER), null, null, null, null, null,
+		    null);
+		
+		assertThat(people, notNullValue());
+		assertThat(people, not(empty()));
+		assertThat(people, everyItem(hasProperty(GENDER_PROPERTY, nullValue())));
+		
+		people = fhirPersonDao.searchForPeople(null, new TokenOrListParam().add(UNKNOWN_GENDER), null, null, null, null,
+		    null, null);
+		
+		assertThat(people, notNullValue());
+		assertThat(people, not(empty()));
+		assertThat(people, everyItem(hasProperty(GENDER_PROPERTY, nullValue())));
 	}
 	
 	@Test
@@ -250,28 +322,16 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 		
 		List<Person> people = getPersonListForSorting(sort);
 		
-		// Smallest given name of person i should be less than the largest given name of person i + 1.
 		for (int i = 1; i < people.size(); i++) {
-			String currentSmallestGivenName = people.get(i - 1).getNames().stream()
-			        .min(Comparator.comparing(pn -> pn.getGivenName())).get().getGivenName();
-			String nextLargestGivenName = people.get(i).getNames().stream()
-			        .max(Comparator.comparing(pn -> pn.getGivenName())).get().getGivenName();
-			
-			assertThat(currentSmallestGivenName, lessThanOrEqualTo(nextLargestGivenName));
+			assertThat(people.get(i - 1).getPersonName(), NAME_MATCHER.lessThanOrEqualTo(people.get(i).getPersonName()));
 		}
 		
 		sort.setOrder(SortOrderEnum.DESC);
 		
 		people = getPersonListForSorting(sort);
 		
-		// Largest given name of person i should be greater than the smallest given name of person i + 1.
 		for (int i = 1; i < people.size(); i++) {
-			String largestGivenName = people.get(i - 1).getNames().stream()
-			        .max(Comparator.comparing(pn -> pn.getGivenName())).get().getGivenName();
-			String nextSmallestGivenName = people.get(i).getNames().stream()
-			        .min(Comparator.comparing(pn -> pn.getGivenName())).get().getGivenName();
-			
-			assertThat(largestGivenName, greaterThanOrEqualTo(nextSmallestGivenName));
+			assertThat(people.get(i - 1).getPersonName(), NAME_MATCHER.greaterThanOrEqualTo(people.get(i).getPersonName()));
 		}
 	}
 	
@@ -343,7 +403,7 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	@Test
 	public void shouldReturnCollectionOfPeopleSortedByPostalCode() {
 		SortSpec sort = new SortSpec();
-		sort.setParamName("address-postalCode");
+		sort.setParamName("address-postalcode");
 		sort.setOrder(SortOrderEnum.ASC);
 		
 		List<Person> people = getPersonListForSorting(sort);
@@ -389,7 +449,7 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 	@Test
 	public void shouldHandleComplexQuery() throws ParseException {
 		StringOrListParam nameParam = new StringOrListParam().add(new StringParam(PERSON_NAME));
-		TokenOrListParam genderParam = new TokenOrListParam().add(GENDER);
+		TokenOrListParam genderParam = new TokenOrListParam().add(MALE_GENDER);
 		DateRangeParam birthDateParam = new DateRangeParam().setLowerBound(BIRTH_DATE).setUpperBound(BIRTH_DATE);
 		StringOrListParam cityParam = new StringOrListParam().add(new StringParam(CITY));
 		StringOrListParam stateParam = new StringOrListParam().add(new StringParam(STATE));
@@ -403,7 +463,7 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 		assertThat(people, not(empty()));
 		assertThat(people.size(), greaterThanOrEqualTo(1));
 		assertThat(people.iterator().next().getGivenName(), equalTo(PERSON_NAME));
-		assertThat(people.iterator().next().getGender(), equalTo(GENDER));
+		assertThat(people.iterator().next().getGender(), equalTo("M"));
 		assertThat(people.iterator().next().getBirthdate(), DateMatchers.sameDay(DATE_FORMAT.parse(BIRTH_DATE)));
 		assertThat(people.iterator().next().getUuid(), equalTo(PERSON_ADDRESS_PERSON_UUID));
 	}
@@ -429,22 +489,22 @@ public class FhirPersonDaoImplTest extends BaseModuleContextSensitiveTest {
 		List<Person> peopleList = new ArrayList<>(people);
 		// Remove people with sort parameter value null, to allow comparison while asserting. 
 		switch (sort.getParamName()) {
-			case "name":
-				peopleList.removeIf(p -> p.getGivenName() == null);
+			case SP_NAME:
+				peopleList.removeIf(p -> p.getPersonName() == null);
 				break;
-			case "birthdate":
+			case SP_BIRTHDATE:
 				peopleList.removeIf(p -> p.getBirthdate() == null);
 				break;
-			case "address-city":
+			case SP_ADDRESS_CITY:
 				peopleList.removeIf(p -> p.getPersonAddress() == null || p.getPersonAddress().getCityVillage() == null);
 				break;
-			case "address-state":
+			case SP_ADDRESS_STATE:
 				peopleList.removeIf(p -> p.getPersonAddress() == null || p.getPersonAddress().getStateProvince() == null);
 				break;
-			case "address-postalCode":
+			case SP_ADDRESS_POSTALCODE:
 				peopleList.removeIf(p -> p.getPersonAddress() == null || p.getPersonAddress().getPostalCode() == null);
 				break;
-			case "address-country":
+			case SP_ADDRESS_COUNTRY:
 				peopleList.removeIf(p -> p.getPersonAddress() == null || p.getPersonAddress().getCountry() == null);
 				break;
 		}

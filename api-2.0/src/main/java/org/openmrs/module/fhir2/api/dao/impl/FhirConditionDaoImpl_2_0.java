@@ -21,8 +21,11 @@ import ca.uhn.fhir.rest.param.DateParam;
 import ca.uhn.fhir.rest.param.QuantityParam;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
+import java.util.Date;
+
 import lombok.AccessLevel;
 import lombok.Setter;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.openmrs.annotation.OpenmrsProfile;
 import org.openmrs.module.emrapi.conditionslist.Condition;
@@ -52,5 +55,39 @@ public class FhirConditionDaoImpl_2_0 implements FhirConditionDao<Condition> {
 	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
 	        DateParam recordedDate, SortSpec sort) {
 		return null; // TODO
+	}
+	
+	public Condition saveCondition(Condition condition) {
+		Session session = sessionFactory.getCurrentSession();
+		Date endDate = condition.getEndDate() != null ? condition.getEndDate() : new Date();
+		if (condition.getEndReason() != null) {
+			condition.setEndDate(endDate);
+		}
+		
+		Condition existingCondition = getConditionByUuid(condition.getUuid());
+		if (condition.equals(existingCondition)) {
+			return existingCondition;
+		}
+		if (existingCondition == null) {
+			session.saveOrUpdate(condition);
+			return condition;
+		}
+		
+		condition = Condition.newInstance(condition);
+		condition.setPreviousCondition(existingCondition);
+		
+		if (existingCondition.getStatus().equals(condition.getStatus())) {
+			existingCondition.setVoided(true);
+			session.saveOrUpdate(existingCondition);
+			session.saveOrUpdate(condition);
+			return condition;
+		}
+		Date onSetDate = condition.getOnsetDate() != null ? condition.getOnsetDate() : new Date();
+		existingCondition.setEndDate(onSetDate);
+		session.saveOrUpdate(existingCondition);
+		condition.setOnsetDate(onSetDate);
+		session.saveOrUpdate(condition);
+		
+		return condition;
 	}
 }

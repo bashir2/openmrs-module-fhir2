@@ -42,8 +42,19 @@ public class FhirConstants {
 	
 	public static final String CLINICAL_FINDINGS_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX + "/clinical-findings";
 	
+	public static final String MEDICATION_CODES_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX + "/medication-codes";
+	
+	public static final String MEDICATION_FORM_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX + "/medication-form-codes";
+	
+	public static final String MEDICATION_INGREDIENT_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX
+	        + "/medication-ingredient-codes";
+	
 	public static final String ALLERGY_INTOLERANCE_CLINICAL_STATUS_VALUE_SET = HL7_FHIR_CODE_SYSTEM_PREFIX
 	        + "/allergyintolerance-clinical";
+	
+	public static final String TASK_STATUS_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX + "/task-status";
+	
+	public static final String RESOURCE_TYPES_VALUE_SET_URI = HL7_FHIR_VALUE_SET_PREFIX + "/resource-types";
 	
 	public static final String OBSERVATION_REFERENCE_NORMAL = "normal";
 	
@@ -62,6 +73,8 @@ public class FhirConstants {
 	
 	public static final String OPENMRS_FHIR_EXT_ADDRESS = OPENMRS_FHIR_EXT_PREFIX + "/address";
 	
+	public static final String OPENMRS_FHIR_EXT_MEDICINE = OPENMRS_FHIR_EXT_PREFIX + "/medicine";
+	
 	public static final String OPENMRS_FHIR_EXT_USER_IDENTIFIER = OPENMRS_FHIR_EXT_PREFIX + "/user/identifier";
 	
 	public static final String OPENMRS_FHIR_EXT_PROVIDER_IDENTIFIER = OPENMRS_FHIR_EXT_PREFIX + "/provider/identifier";
@@ -78,6 +91,8 @@ public class FhirConstants {
 	
 	public static final String OBSERVATION = "Observation";
 	
+	public static final String ORGANIZATION = "Organization";
+	
 	public static final String LOCATION = "Location";
 	
 	public static final String PATIENT = "Patient";
@@ -87,6 +102,12 @@ public class FhirConstants {
 	public static final String IDENTIFIER = "identifier";
 	
 	public static final String DIAGNOSTIC_REPORT = "DiagnosticReport";
+	
+	public static final String SERVICE_REQUEST = "ServiceRequest";
+	
+	public static final String TASK = "Task";
+	
+	public static final String MEDICATION = "Medication";
 	
 	public static final String DIAGNOSTIC_REPORT_CATEGORY_LAB = "LAB";
 	
@@ -106,5 +127,9 @@ public class FhirConstants {
 	public static final String GLOBAL_PROPERTY_MODERATE = "allergy.concept.severity.moderate";
 	
 	public static final String GLOBAL_PROPERTY_OTHER = "allergy.concept.severity.other";
+	
+	public static final String AUTHOR = "author";
+	
+	public static final String AUT = "AUT";
 	
 }
