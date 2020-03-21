@@ -15,14 +15,13 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.util.Collection;
+import java.util.Date;
 
 import ca.uhn.fhir.rest.api.SortSpec;
 import ca.uhn.fhir.rest.param.DateParam;
 import ca.uhn.fhir.rest.param.QuantityParam;
 import ca.uhn.fhir.rest.param.ReferenceParam;
 import ca.uhn.fhir.rest.param.TokenOrListParam;
-import java.util.Date;
-
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.Session;

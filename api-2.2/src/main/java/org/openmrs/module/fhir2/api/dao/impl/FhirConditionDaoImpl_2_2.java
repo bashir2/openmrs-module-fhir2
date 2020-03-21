@@ -15,6 +15,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.Optional;
 
 import ca.uhn.fhir.rest.api.SortSpec;
@@ -25,10 +26,6 @@ import ca.uhn.fhir.rest.param.TokenOrListParam;
 import lombok.AccessLevel;
 import lombok.Setter;
 import org.hibernate.Criteria;
-import java.util.Date;
-
-import lombok.AccessLevel;
-import lombok.Setter;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.openmrs.Condition;
@@ -71,7 +68,7 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
 	        DateParam recordedData, SortSpec sort) {
 		Criteria criteria = sessionFactory.getCurrentSession().createCriteria(Condition.class);
-
+		
 		handlePatientReference(criteria, patientParam);
 		// TODO during review: Do we require a ":Patient" modifier or a "Patient/" type for the "subject" search param?
 		// And do we want to support anything other than "Patient" under "subject" based searches (e.g., "Group")?
@@ -80,22 +77,21 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 		// TODO: Handle onsetAge as well.
 		handleDate("dateCreated", recordedData).ifPresent(criteria::add);
 		handleOrListParam(clinicalStatus,
-				tokenParam -> Optional.of(eq("clinicalStatus", convertStatus(tokenParam.getValue()))))
-				.ifPresent(criteria::add);
+		    tokenParam -> Optional.of(eq("clinicalStatus", convertStatus(tokenParam.getValue())))).ifPresent(criteria::add);
 		if (code != null) {
 			// TODO add support for code system as well (not just the code value), possibly using ConceptTranslator.
 			criteria.createAlias("condition.coded", "cd");
 			criteria.createAlias("cd.conceptMappings", "map");
 			criteria.createAlias("map.conceptReferenceTerm", "term");
 			handleOrListParam(code, tokenParam -> Optional.of(eq("term.code", tokenParam.getValue())))
-					.ifPresent(criteria::add);
+			        .ifPresent(criteria::add);
 		}
-
+		
 		handleSort(criteria, sort);
-
+		
 		return criteria.list();
 	}
-
+	
 	@Override
 	public Condition saveCondition(Condition condition) {
 		Session session = sessionFactory.getCurrentSession();

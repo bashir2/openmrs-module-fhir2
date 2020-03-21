@@ -54,12 +54,10 @@ public class FhirConditionServiceImpl_2_2 implements FhirConditionService {
 	public Collection<Condition> searchConditions(ReferenceParam patientParam, ReferenceParam subjectParam,
 	        TokenOrListParam code, TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge,
 	        DateParam recordedDate, @Sort SortSpec sort) {
-		return dao
-				.searchForConditions(patientParam, subjectParam, code, clinicalStatus, onsetDate, onsetAge,
-						recordedDate,
-						sort).stream().map(conditionTranslator::toFhirResource).collect(Collectors.toList());
+		return dao.searchForConditions(patientParam, subjectParam, code, clinicalStatus, onsetDate, onsetAge, recordedDate,
+		    sort).stream().map(conditionTranslator::toFhirResource).collect(Collectors.toList());
 	}
-
+	
 	public Condition saveCondition(Condition condition) {
 		return conditionTranslator.toFhirResource(dao.saveCondition(conditionTranslator.toOpenmrsType(condition)));
 	}

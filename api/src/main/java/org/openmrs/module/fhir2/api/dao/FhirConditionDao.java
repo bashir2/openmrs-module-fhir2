@@ -26,6 +26,6 @@ public interface FhirConditionDao<T> {
 	Collection<T> searchForConditions(ReferenceParam patientParam, ReferenceParam subjectParam, TokenOrListParam code,
 	        TokenOrListParam clinicalStatus, DateParam onsetDate, QuantityParam onsetAge, DateParam recordedDate,
 	        SortSpec sort);
-
+	
 	T saveCondition(@NotNull T condition);
 }
