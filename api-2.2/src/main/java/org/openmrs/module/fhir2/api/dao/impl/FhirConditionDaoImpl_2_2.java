@@ -82,7 +82,8 @@ public class FhirConditionDaoImpl_2_2 extends BaseDaoImpl implements FhirConditi
 			criteria.createAlias("condition.coded", "cd");
 			criteria.createAlias("cd.conceptMappings", "map");
 			criteria.createAlias("map.conceptReferenceTerm", "term");
-			handleOrListParam(code, tokenParam -> Optional.of(eq("term.code", tokenParam.getValue()))).ifPresent(criteria::add);
+			handleOrListParam(code, tokenParam -> Optional.of(eq("term.code", tokenParam.getValue())))
+			        .ifPresent(criteria::add);
 		}
 		
 		handleSort(criteria, sort);

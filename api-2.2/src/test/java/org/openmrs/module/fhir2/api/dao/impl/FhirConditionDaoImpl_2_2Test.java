@@ -149,16 +149,16 @@ public class FhirConditionDaoImpl_2_2Test extends BaseModuleContextSensitiveTest
 	@Test
 	public void searchForPatients_shouldReturnConditionByOnsetDate() {
 		String testDate = "2017-01-12";
-
+		
 		DateParam onsetDate = new DateParam("eq" + testDate);
 		Collection<Condition> results = dao.searchForConditions(null, null, null, null, onsetDate, null, null, null);
-
+		
 		assertThat(results, notNullValue());
 		assertThat(results, not(empty()));
 		assertThat(results.size(), equalTo(3));
 		assertThat(results.iterator().next().getOnsetDate().toString(), startsWith(testDate));
 	}
-
+	
 	@Test
 	public void searchForPatients_shouldReturnConditionByRecordedDate() {
 		String testDate = "2016-01-12";
@@ -207,24 +207,24 @@ public class FhirConditionDaoImpl_2_2Test extends BaseModuleContextSensitiveTest
 		assertThat(results, not(empty()));
 		assertThat(results.size(), equalTo(6));
 	}
-
+	
 	@Test
 	public void searchForPatients_shouldReturnConditionByCode() {
 		TokenOrListParam listParam = new TokenOrListParam();
-		listParam.add(new TokenParam("CD41003"));  // for concept_id=5497
+		listParam.add(new TokenParam("CD41003")); // for concept_id=5497
 		Collection<Condition> results = dao.searchForConditions(null, null, listParam, null, null, null, null, null);
-
+		
 		assertThat(results, notNullValue());
 		assertThat(results, not(empty()));
 		assertThat(results.size(), equalTo(1));
 		assertThat(results.iterator().next().getCondition().getCoded().getConceptId(), equalTo(5497));
 	}
-
+	
 	@Test
 	public void searchForPatients_shouldReturnMultipleConditionsByCodeList() {
 		TokenOrListParam listParam = new TokenOrListParam();
-		listParam.add(new TokenParam("CD41003"));  // for concept_id=5497
-		listParam.add(new TokenParam("WGT234"));  // for concept_id=5089
+		listParam.add(new TokenParam("CD41003")); // for concept_id=5497
+		listParam.add(new TokenParam("WGT234")); // for concept_id=5089
 		Collection<Condition> results = dao.searchForConditions(null, null, listParam, null, null, null, null, null);
 		
 		assertThat(results, notNullValue());
